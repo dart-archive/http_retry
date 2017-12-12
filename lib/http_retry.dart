@@ -65,7 +65,8 @@ class RetryClient extends BaseClient {
   Future<StreamedResponse> send(BaseRequest request) async {
     var splitter = new StreamSplitter(request.finalize());
 
-    for (var i = 0;; i++) {
+    var i = 0;
+    while (true) {
       var response = await _inner.send(_copyRequest(request, splitter.split()));
       if (i == _retries || !_when(response)) return response;
 
@@ -73,6 +74,7 @@ class RetryClient extends BaseClient {
       // dangling connections.
       response.stream.listen((_) {}).cancel()?.catchError((_) {});
       await new Future.delayed(_delay(i));
+      i++;
     }
   }
 
