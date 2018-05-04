@@ -7,8 +7,6 @@ language: dart
 
 dart:
 - dev
-- stable
-
 # See https://docs.travis-ci.com/user/languages/dart/ for details.
 dart_task:
 - test: --platform vm
