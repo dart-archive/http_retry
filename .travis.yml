@@ -9,7 +9,7 @@ dart:
 - dev
 # See https://docs.travis-ci.com/user/languages/dart/ for details.
 dart_task:
-  - dartfmt:
+  - dartfmt
   - dartanalyzer
   - test: --platform vm
     xvfb: false
@@ -20,10 +20,13 @@ dart_task:
 # them against each Dart version.
 matrix:
   exclude:
-  - dart: stable
-    dart_task: dartfmt
-  - dart: stable
-    dart_task: dartanalyzer
+    - dart: stable
+      dart_task: dartfmt
+    - dart: stable
+      dart_task: dartanalyzer
+  allow_failures:
+    - dart_task: --platform vm
+    - dart_task: --platform firefox
 
 # Only building master means that we don't run two builds for each pull request.
 branches:
