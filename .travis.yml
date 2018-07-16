@@ -11,10 +11,11 @@ dart:
 dart_task:
   - dartfmt
   - dartanalyzer
-  - test: --platform vm
-    xvfb: false
-  # Uncomment this line to run tests on the browser.
-  - test: --platform firefox
+  # TODO: reinstate tests once https://github.com/dart-lang/http_retry/issues/6 is fixed
+  #  - test: --platform vm
+  #    xvfb: false
+  #  # Uncomment this line to run tests on the browser.
+  #  - test: --platform firefox
 
 # Only run one instance of the formatter and the analyzer, rather than running
 # them against each Dart version.
@@ -24,9 +25,6 @@ matrix:
       dart_task: dartfmt
     - dart: stable
       dart_task: dartanalyzer
-  allow_failures:
-    - dart_task: --platform vm
-    - dart_task: --platform firefox
 
 # Only building master means that we don't run two builds for each pull request.
 branches:
