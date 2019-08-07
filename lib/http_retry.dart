@@ -17,6 +17,9 @@ class RetryClient extends BaseClient {
   /// The number of times a request should be retried.
   final int _retries;
 
+  // The timeout at which a request will be cancelled and retried
+  final Duration _timeout;
+
   /// The callback that determines whether a request should be retried.
   final bool Function(BaseResponse) _when;
 
@@ -44,17 +47,22 @@ class RetryClient extends BaseClient {
   /// [delay] is passed, it's used to determine the time to wait before the
   /// given (zero-based) retry.
   ///
+  /// By default, this times out a request after 1 minute and then retries it
+  ///
   /// If [onRetry] is passed, it's called immediately before each retry so that
   /// the client has a chance to perform side effects like logging. The
   /// `response` parameter will be null if the request was retried due to an
   /// error for which [whenError] returned `true`.
-  RetryClient(this._inner,
-      {int retries,
-      bool when(BaseResponse response),
-      bool whenError(error, StackTrace stackTrace),
-      Duration delay(int retryCount),
-      void onRetry(BaseRequest request, BaseResponse response, int retryCount)})
-      : _retries = retries ?? 3,
+  RetryClient(
+    this._inner, {
+    int retries,
+    bool when(BaseResponse response),
+    bool whenError(error, StackTrace stackTrace),
+    Duration delay(int retryCount),
+    Duration timeout,
+    void onRetry(BaseRequest request, BaseResponse response, int retryCount),
+  })  : _retries = retries ?? 3,
+        _timeout = timeout ?? Duration(minutes: 1),
         _when = when ?? ((response) => response.statusCode == 503),
         _whenError = whenError ?? ((_, __) => false),
         _delay = delay ??
@@ -73,18 +81,21 @@ class RetryClient extends BaseClient {
   RetryClient.withDelays(Client inner, Iterable<Duration> delays,
       {bool when(BaseResponse response),
       bool whenError(error, StackTrace stackTrace),
+      Duration timeout,
       void onRetry(BaseRequest request, BaseResponse response, int retryCount)})
       : this._withDelays(inner, delays.toList(),
             when: when, whenError: whenError, onRetry: onRetry);
 
   RetryClient._withDelays(Client inner, List<Duration> delays,
       {bool when(BaseResponse response),
+      Duration timeout,
       bool whenError(error, StackTrace stackTrace),
       void onRetry(BaseRequest request, BaseResponse response, int retryCount)})
       : this(inner,
             retries: delays.length,
             delay: (retryCount) => delays[retryCount],
             when: when,
+            timeout: timeout,
             whenError: whenError,
             onRetry: onRetry);
 
@@ -93,10 +104,14 @@ class RetryClient extends BaseClient {
     var splitter = StreamSplitter(request.finalize());
 
     var i = 0;
-    for (;;) {
+    while (true) {
       StreamedResponse response;
       try {
-        response = await _inner.send(_copyRequest(request, splitter.split()));
+        response = await _inner
+            .send(_copyRequest(request, splitter.split()))
+            .timeout(_timeout, onTimeout: () {
+          throw new Exception(TimeoutException);
+        });
       } catch (error, stackTrace) {
         if (i == _retries || !_whenError(error, stackTrace)) rethrow;
       }
@@ -106,10 +121,9 @@ class RetryClient extends BaseClient {
 
         // Make sure the response stream is listened to so that we don't leave
         // dangling connections.
-        unawaited(response.stream.listen((_) {}).cancel()?.catchError((_) {}));
+        response.stream.listen((_) {}).cancel()?.catchError((_) {});
       }
-
-      await Future.delayed(_delay(i));
+      await new Future.delayed(_delay(i));
       if (_onRetry != null) _onRetry(request, response, i);
       i++;
     }
@@ -117,7 +131,7 @@ class RetryClient extends BaseClient {
 
   /// Returns a copy of [original] with the given [body].
   StreamedRequest _copyRequest(BaseRequest original, Stream<List<int>> body) {
-    var request = StreamedRequest(original.method, original.url);
+    var request = new StreamedRequest(original.method, original.url);
     request.contentLength = original.contentLength;
     request.followRedirects = original.followRedirects;
     request.headers.addAll(original.headers);
@@ -132,6 +146,6 @@ class RetryClient extends BaseClient {
     return request;
   }
 
-  @override
   void close() => _inner.close();
 }
+
