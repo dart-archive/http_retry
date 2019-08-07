@@ -47,7 +47,7 @@ class RetryClient extends BaseClient {
   /// [delay] is passed, it's used to determine the time to wait before the
   /// given (zero-based) retry.
   ///
-  /// By default, this times out a request after 1 minute and then retries it
+  /// By default, this times out a request after 1 minute and then retries it.
   ///
   /// If [onRetry] is passed, it's called immediately before each retry so that
   /// the client has a chance to perform side effects like logging. The
@@ -110,7 +110,7 @@ class RetryClient extends BaseClient {
         response = await _inner
             .send(_copyRequest(request, splitter.split()))
             .timeout(_timeout, onTimeout: () {
-          throw new Exception(TimeoutException);
+          throw Exception(TimeoutException);
         });
       } catch (error, stackTrace) {
         if (i == _retries || !_whenError(error, stackTrace)) rethrow;
@@ -121,9 +121,9 @@ class RetryClient extends BaseClient {
 
         // Make sure the response stream is listened to so that we don't leave
         // dangling connections.
-        response.stream.listen((_) {}).cancel()?.catchError((_) {});
+        unawaited(response.stream.listen((_) {}).cancel()?.catchError((_) {}));
       }
-      await new Future.delayed(_delay(i));
+      await Future.delayed(_delay(i));
       if (_onRetry != null) _onRetry(request, response, i);
       i++;
     }
@@ -131,7 +131,7 @@ class RetryClient extends BaseClient {
 
   /// Returns a copy of [original] with the given [body].
   StreamedRequest _copyRequest(BaseRequest original, Stream<List<int>> body) {
-    var request = new StreamedRequest(original.method, original.url);
+    var request = StreamedRequest(original.method, original.url);
     request.contentLength = original.contentLength;
     request.followRedirects = original.followRedirects;
     request.headers.addAll(original.headers);
@@ -146,6 +146,6 @@ class RetryClient extends BaseClient {
     return request;
   }
 
+  @override
   void close() => _inner.close();
 }
-
